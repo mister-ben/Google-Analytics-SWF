@@ -5,51 +5,72 @@ This project provides a Flash plug-in for measuring analytics within
 Brightcove video players. It can be used out-of-the-box for simple
 analytics or as a framework to customize data.
 
+Universal Update
+================
+
+###Universal analyics
+This plugin now additionally supports Universal Analytics. To use Universal Analytics, add `&universal=true` to the plugin URL.
+
+###Non-interaction events
+If using Universal Analytics you can also opt to use non-interaction events by adding `&ni=true` to the URL. Non-interaction events probably make sense for video, but don't show up in real-time analytics.
+
+###Other changess
+
+* Fixes crash if no content has been loaded into the player when plugin initialises
+* Uses "Brightcove Player" rather than "null" if `&playerType` isn't specified
+* Bumped version number to 2 for Universal Analytics changes
+
 Setup
 =====
 
 If you don't want to modify the code, follow these steps:
 
-1.	Grab the latest `GoogleAnalytics.swf` file from the `bin-release` folder.
+1.  Grab the latest `GoogleAnalytics.swf` file from the `bin-release` folder. (Go  [here](https://github.com/mister-ben/Google-Analytics-SWF/blob/master/bin-release/GoogleAnalytics.swf), click `view raw`).
 
-2.	Upload the file to a server that's URL addressable; make note of that URL
+2.  Upload the file to a server that's URL addressable; make note of that URL. Make sure a [crossdomain secuirty policy file](http://support.brightcove.com/en/video-cloud/docs/cross-domain-security-flash) is present on that server.
 
-3.	Add `?accountNumber=UA-123456789-0` to the URL (UA-123456789-0 will be
-	replaced with your Google Analytics Account Number)
+3.  Add `?accountNumber=UA-123456789-0` to the URL (UA-123456789-0 will be
+  replaced with your Google Analytics Account Number)
 
-	*	By default, all of these events will be tracked under the Google
-		Analytics Category of "Brightcove Player". If you'd like to change that,
-		you can specify `playerType` as another parameter,
-		e.g. `?accountNumber=UA-123456789-0&playerType=Open%20Source%20Testing`
-		
-		Also, you can specify the playerType as {playername} to have it dynamically 
-		use the name you specified for the player in the Brightcove Studio. 
-		e.g. `?accountNumber=UA-123456789-0&playerType={playername}`
+  * By default, all of these events will be tracked under the Google
+    Analytics Category of "Brightcove Player". If you'd like to change that,
+    you can specify `playerType` as another parameter,
+    e.g. `?accountNumber=UA-123456789-0&playerType=Open%20Source%20Testing`
+    
+    Also, you can specify the playerType as {playername} to have it dynamically 
+    use the name you specified for the player in the Brightcove Studio. 
+    e.g. `?accountNumber=UA-123456789-0&playerType={playername}`
 
-		*	Note that the `playerType` must be URL-encoded
+    * Note that the `playerType` must be URL-encoded
+  
+  * If you need to use Universal Analytics, append `&universal=true` to the URL
 
-	*	Alternatively, these parameters can be added to the publishing code as
-		below (`playerType` is optional):
+  * If you use Universal Analytics and want to use non-interaction events, add `&ni=true` to the URL
 
-		`<param name="accountNumber" value="UA-123456789-0" /><param name="playerType" value="Open%20Source%20Testing" />`
+  * Alternatively, these parameters can be added to the publishing code as
+    below (`playerType` is optional):
 
-4.	Log in to your Brightcove account
+    `<param name="accountNumber" value="UA-123456789-0" /><param name="playerType" value="Open%20Source%20Testing" />`
 
-5.	Edit your Brightcove player and add the URL under the "plugins" tab
+4.  Log in to your Brightcove account
 
-6.	Save your player changes
-	
+5.  Edit your Brightcove player and add the URL under the "plugins" tab
+
+6.  Save your player changes
+  
 If you want to make modifications to the SWF / codebase, follow these steps:
 
-1.	Import the project into either FlexBuilder or FlashBuilder
+1.  Import the project into either FlexBuilder or FlashBuilder
 
-2.	Add the `.swc` files in the `lib` folder under the project's properties
-	setting	
+2.  Add the `.swc` files in the `lib` folder under the project's properties
+  setting 
 
-3.	To get a SWF of an optimized size, make sure to do a release build
+3.  To get a SWF of an optimized size, make sure to do a release build
 
 Usage
 =====
+
+*Some of these details are out of date due to Google Analytics changes*
 
 To understand how Google Analytics treats Categories, Actions and Labels,
 please refer to the Google Analytics
@@ -81,3 +102,4 @@ Current Supported Events
 
 To view a list of supported events, and to see what can potentially be 
 tracked, you can view [Action.as in src > com > brightcoveos > Action.as](https://github.com/BrightcoveOS/Google-Analytics-SWF/blob/master/src/com/brightcoveos/Action.as).gle-Analytics-SWF/blob/master/src/com/brightcoveos/Action.as).
+

@@ -1,5 +1,5 @@
 /**
- * Brightcove Google Analytics SWF 1.1.4 (4 MAY 2012)
+ * Brightcove Google Analytics SWF 2.0.0 (2014-08-22)
  *
  * REFERENCES:
  *	 Website: http://opensource.brightcove.com
@@ -53,6 +53,11 @@ package {
 	
 	import flash.display.LoaderInfo;
 	import flash.net.SharedObject;
+	import flash.events.Event;
+	import flash.events.SecurityErrorEvent;
+	import flash.events.IOErrorEvent;
+	import flash.net.URLRequest;
+	import flash.display.Loader;
 
 	public class GoogleAnalytics extends CustomModule
 	{
@@ -65,7 +70,7 @@ package {
 		3) Page URL: http://somedomain.com/section/category/page?accountNumber=UA-123456-0
 		*/
 		private static var ACCOUNT_NUMBER:String = "";
-		private static const VERSION:String = "1.1.3";
+		private static const VERSION:String = "2.0.0";
 		
 		private var _experienceModule:ExperienceModule;
 		private var _videoPlayerModule:VideoPlayerModule;
@@ -81,7 +86,10 @@ package {
 		private var _previousTimestamp:Number;
 		private var _timeWatched:Number; //stored in milliseconds
 		private var _storedTimeWatched:SharedObject = SharedObject.getLocal("previousVideo");
-		
+
+		private var _universal:Boolean = false;
+		private var _ni:Boolean = false;
+
 		//flags for tracking
 		private var _mediaBegin:Boolean = false;
 		private var _mediaComplete:Boolean = true;
@@ -95,7 +103,8 @@ package {
     {
       trace("@project GoogleAnalytics");
       trace("@author Brandon Aaskov");
-      trace("@lastModified 05.04.12 3:56 PM EST");
+      trace("@author misterben");
+      trace("@lastModified 2014-08-22 12:23 UTC");
     }
     
 		override protected function initialize():void
@@ -107,30 +116,79 @@ package {
 			
 			debug("Version " + GoogleAnalytics.VERSION);
 			_debugEnabled = (getParamValue('debug') == "true") ? true : false;
+
+			_universal = (getParamValue('universal') == "true") ? true : false;
+			if (_universal) {
+				debug("Universal Analytics");
+				_ni = (getParamValue('ni') == "true") ? true : false;
+				if (_ni) {
+					debug("Using non interaction");
+				}
+			}
 			
 			setupEventListeners();
 			
-			_currentVideo = _videoPlayerModule.getCurrentVideo();
-			_customVideoID = getCustomVideoID(_currentVideo);
-			_storedTimeWatched.data.abandonedVideo = _currentVideo;
-			
 			setAccountNumber();
 			setPlayerType();
-			createCuePoints(_currentVideo);
+			
 			
 			debug("GA Debug Enabled = " + _debugEnabled);
-			_tracker = new GATracker(_experienceModule.getStage(), GoogleAnalytics.ACCOUNT_NUMBER, "AS3", _debugEnabled);
+			if ( !_universal ) {
+				_tracker = new GATracker(_experienceModule.getStage(), GoogleAnalytics.ACCOUNT_NUMBER, "AS3", _debugEnabled);
+			}
 			
 			checkAbandonedVideo(); //check if a video didn't get a completion tracked
 			
-			_tracker.trackEvent(Category.VIDEO, Action.PLAYER_LOAD, _experienceModule.getExperienceURL());
-			_tracker.trackEvent(Category.VIDEO, Action.VIDEO_LOAD, _customVideoID);
+			trackEvent(Category.VIDEO, Action.PLAYER_LOAD, escape(_experienceModule.getExperienceURL()));
+
+			_currentVideo = _videoPlayerModule.getCurrentVideo();
+			if (_currentVideo) {
+				_customVideoID = getCustomVideoID(_currentVideo);
+				_storedTimeWatched.data.abandonedVideo = _currentVideo;
+				createCuePoints(_currentVideo);
+				trackEvent(Category.VIDEO, Action.VIDEO_LOAD, _customVideoID);
+				var referrerURL:String = _experienceModule.getReferrerURL();
+				var trackingAction:String = Action.REFERRER_URL + referrerURL; //tracks even if referrer URL is not available
+				trackEvent(Category.VIDEO, trackingAction, _customVideoID);
+			}
 			
-			var referrerURL:String = _experienceModule.getReferrerURL();
-			var trackingAction:String = Action.REFERRER_URL + referrerURL; //tracks even if referrer URL is not available
-			_tracker.trackEvent(Category.VIDEO, trackingAction, _customVideoID);
 		}
 		
+		private function trackEvent(category:String, action:String, label:String=null, value:Number=undefined):void
+		{
+			if (_universal) {
+				// universal
+				var payload:String = "v=1&tid=" + ACCOUNT_NUMBER + "&cid=555&t=event";
+				payload += "&ec=" + category;
+				payload += "&ea=" + action;
+				if ( label ) {
+					payload += "&el=" + label;
+				}
+				if ( value.toString() != "NaN" ) {
+					payload += "&ev=" + value;
+				}
+				if ( _ni ) {
+					// Non-interaction events seem appropriate for video analytics but doesn't show in real time
+					payload += "&ni=1";
+				}
+				payload += "&time=" + new Date().getTime(); //cachebust
+				var req:URLRequest = new URLRequest('http://www.google-analytics.com/collect?'+payload);
+			  var l:Loader = new Loader();
+			  l.contentLoaderInfo.addEventListener(Event.COMPLETE, cleanup);
+			  l.contentLoaderInfo.addEventListener(IOErrorEvent.IO_ERROR, cleanup);
+			  l.contentLoaderInfo.addEventListener(SecurityErrorEvent.SECURITY_ERROR, cleanup);
+			  l.load(req);
+			  function cleanup(e:Event):void {
+			    l.contentLoaderInfo.removeEventListener(Event.COMPLETE, cleanup);
+			    l.contentLoaderInfo.removeEventListener(IOErrorEvent.IO_ERROR, cleanup);
+			    l.contentLoaderInfo.removeEventListener(SecurityErrorEvent.SECURITY_ERROR, cleanup);
+			  }
+			}
+			else {
+				_tracker.trackEvent(category, action, label, value);
+			}
+		}
+
 		private function setupEventListeners():void
 		{
 			_experienceModule.addEventListener(ExperienceEvent.ENTER_FULLSCREEN, onEnterFullScreen);
@@ -162,12 +220,12 @@ package {
 		
 		private function onEnterFullScreen(pEvent:ExperienceEvent):void
 		{
-			_tracker.trackEvent(Category.VIDEO, Action.ENTER_FULLSCREEN, _customVideoID);
+			trackEvent(Category.VIDEO, Action.ENTER_FULLSCREEN, _customVideoID);
 		}
 		
 		private function onExitFullScreen(pEvent:ExperienceEvent):void
 		{
-			_tracker.trackEvent(Category.VIDEO, Action.EXIT_FULLSCREEN, _customVideoID);
+			trackEvent(Category.VIDEO, Action.EXIT_FULLSCREEN, _customVideoID);
 		}		
 		
 		private function onMediaChange(pEvent:MediaEvent):void
@@ -177,7 +235,7 @@ package {
 			_storedTimeWatched.data.abandonedVideo = _currentVideo;
 			createCuePoints(_currentVideo);
 			
-			_tracker.trackEvent(Category.VIDEO, Action.VIDEO_LOAD, _customVideoID);
+			trackEvent(Category.VIDEO, Action.VIDEO_LOAD, _customVideoID);
 			
 			_previousTimestamp = new Date().getTime();
 			_timeWatched = 0;
@@ -187,7 +245,7 @@ package {
 		{
 			if(!_mediaBegin)
 			{
-				_tracker.trackEvent(Category.VIDEO, Action.MEDIA_BEGIN, _customVideoID);
+				trackEvent(Category.VIDEO, Action.MEDIA_BEGIN, _customVideoID);
 				
 				_previousTimestamp = new Date().getTime();
 				_timeWatched = 0;
@@ -209,7 +267,7 @@ package {
 			{
 				debug('Media resume');
 				_mediaPaused = false;
-				_tracker.trackEvent(Category.VIDEO, Action.MEDIA_RESUME, _customVideoID);
+				trackEvent(Category.VIDEO, Action.MEDIA_RESUME, _customVideoID);
 			}
 		}
 		
@@ -218,7 +276,7 @@ package {
 			if(!_mediaComplete && !_mediaPaused)
 			{
 				_mediaPaused = true;
-				_tracker.trackEvent(Category.VIDEO, Action.MEDIA_PAUSE, _customVideoID);
+				trackEvent(Category.VIDEO, Action.MEDIA_PAUSE, _customVideoID);
 			}
 		}
 		
@@ -257,13 +315,13 @@ package {
 			{
 				if(_trackSeekForward)
 				{
-					_tracker.trackEvent(Category.VIDEO, Action.SEEK_FORWARD, _customVideoID);
+					trackEvent(Category.VIDEO, Action.SEEK_FORWARD, _customVideoID);
 					_trackSeekForward = false;
 				}
 				
 				if(_trackSeekBackward)
 				{
-					_tracker.trackEvent(Category.VIDEO, Action.SEEK_BACKWARD, _customVideoID);
+					trackEvent(Category.VIDEO, Action.SEEK_BACKWARD, _customVideoID);
 					_trackSeekBackward = false;
 				}
 			}
@@ -284,7 +342,7 @@ package {
 				_mediaComplete = true;
 				_mediaBegin = false;
 			
-				_tracker.trackEvent(Category.VIDEO, Action.MEDIA_COMPLETE, _customVideoID, Math.round(_timeWatched));
+				trackEvent(Category.VIDEO, Action.MEDIA_COMPLETE, _customVideoID, Math.round(_timeWatched));
 			}
 		}
 		
@@ -298,12 +356,12 @@ package {
 				if(rendition.encodingRate > _currentRendition.encodingRate)
 				{
 					//rendition change increase
-					_tracker.trackEvent(Category.VIDEO, Action.RENDITION_CHANGE_INCREASE, _customVideoID, encodingRate);
+					trackEvent(Category.VIDEO, Action.RENDITION_CHANGE_INCREASE, _customVideoID, encodingRate);
 				}
 				else if(rendition.encodingRate < _currentRendition.encodingRate)
 				{
 					//rendition change decrease
-					_tracker.trackEvent(Category.VIDEO, Action.RENDITION_CHANGE_DECREASE, _customVideoID, encodingRate);
+					trackEvent(Category.VIDEO, Action.RENDITION_CHANGE_DECREASE, _customVideoID, encodingRate);
 				}
 			}
 
@@ -318,7 +376,7 @@ package {
 			{
 				_videoMuted = true;
 				
-				_tracker.trackEvent(Category.VIDEO, Action.VIDEO_MUTED, _customVideoID);
+				trackEvent(Category.VIDEO, Action.VIDEO_MUTED, _customVideoID);
 			}
 			else
 			{
@@ -326,7 +384,7 @@ package {
 				{
 					_videoMuted = false;
 					
-					_tracker.trackEvent(Category.VIDEO, Action.VIDEO_UNMUTED, _customVideoID);
+					trackEvent(Category.VIDEO, Action.VIDEO_UNMUTED, _customVideoID);
 				}
 			}
 		}
@@ -335,11 +393,11 @@ package {
 		{
 			if(_videoPlayerModule.isMuted())
 			{
-				_tracker.trackEvent(Category.VIDEO, Action.VIDEO_MUTED, _customVideoID);
+				trackEvent(Category.VIDEO, Action.VIDEO_MUTED, _customVideoID);
 			}
 			else
 			{
-				_tracker.trackEvent(Category.VIDEO, Action.VIDEO_UNMUTED, _customVideoID);
+				trackEvent(Category.VIDEO, Action.VIDEO_UNMUTED, _customVideoID);
 			}
 		}
 		
@@ -364,13 +422,13 @@ package {
                 switch(pEvent.cuePoint.metadata)
                 {
                 	case "25%":
-                		_tracker.trackEvent(Category.VIDEO, Action.MILESTONE_25, _customVideoID);
+                		trackEvent(Category.VIDEO, Action.MILESTONE_25, _customVideoID);
                 		break;
                 	case "50%":
-                		_tracker.trackEvent(Category.VIDEO, Action.MILESTONE_50, _customVideoID);
+                		trackEvent(Category.VIDEO, Action.MILESTONE_50, _customVideoID);
                 		break;
                 	case "75%":
-                		_tracker.trackEvent(Category.VIDEO, Action.MILESTONE_75, _customVideoID);
+                		trackEvent(Category.VIDEO, Action.MILESTONE_75, _customVideoID);
                 		break;
                 }
             }
@@ -405,32 +463,32 @@ package {
         
         private function onAdStart(pEvent:AdEvent):void
         {
-        	_tracker.trackEvent(Category.VIDEO, Action.AD_START, _customVideoID);
+        	trackEvent(Category.VIDEO, Action.AD_START, _customVideoID);
         }
         
         private function onAdPause(pEvent:AdEvent):void
         {
-        	_tracker.trackEvent(Category.VIDEO, Action.AD_PAUSE, _customVideoID);
+        	trackEvent(Category.VIDEO, Action.AD_PAUSE, _customVideoID);
         }
        
         private function onAdPostrollsComplete(pEvent:AdEvent):void
         {
-        	_tracker.trackEvent(Category.VIDEO, Action.AD_POSTROLLS_COMPLETE, _customVideoID);
+        	trackEvent(Category.VIDEO, Action.AD_POSTROLLS_COMPLETE, _customVideoID);
         }
         
         private function onAdResume(pEvent:AdEvent):void
         {
-        	_tracker.trackEvent(Category.VIDEO, Action.AD_RESUME, _customVideoID);
+        	trackEvent(Category.VIDEO, Action.AD_RESUME, _customVideoID);
         }
         
         private function onAdComplete(pEvent:AdEvent):void
         {
-        	_tracker.trackEvent(Category.VIDEO, Action.AD_COMPLETE, _customVideoID);
+        	trackEvent(Category.VIDEO, Action.AD_COMPLETE, _customVideoID);
         }
         
         private function onExternalAd(pEvent:AdEvent):void
         {
-        	_tracker.trackEvent(Category.VIDEO, Action.EXTERNAL_AD, _customVideoID);
+        	trackEvent(Category.VIDEO, Action.EXTERNAL_AD, _customVideoID);
         }
 
 		
@@ -476,7 +534,7 @@ package {
 		{
 			var playerType:String = unescape(getParamValue('playerType'));
 			
-			if(playerType)
+			if(playerType && playerType != "null")
 			{
 				if(playerType == "{playername}")
 				{
@@ -486,6 +544,10 @@ package {
 				{
 					Category.VIDEO = playerType;	
 				}
+			}
+			else
+			{
+				Category.VIDEO = "Brightcove Player";
 			}
 			
 			debug("playerType = " + Category.VIDEO);
@@ -499,7 +561,7 @@ package {
 				var timeWatched:Number = Math.round(_storedTimeWatched.data.abandonedTimeWatched);
 				
 				debug("Tracking video that was previously unclosed: " + customVideoID + " : " + timeWatched);
-				_tracker.trackEvent(Category.VIDEO, Action.MEDIA_ABANDONED, customVideoID, timeWatched);
+				trackEvent(Category.VIDEO, Action.MEDIA_ABANDONED, customVideoID, timeWatched);
 			}
 		}
 		
