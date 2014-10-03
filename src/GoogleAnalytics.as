@@ -90,6 +90,8 @@ package {
 		private var _universal:Boolean = false;
 		private var _ni:Boolean = false;
 
+		private var _protocol:String = 'http';
+
 		//flags for tracking
 		private var _mediaBegin:Boolean = false;
 		private var _mediaComplete:Boolean = true;
@@ -116,6 +118,11 @@ package {
 			
 			debug("Version " + GoogleAnalytics.VERSION);
 			_debugEnabled = (getParamValue('debug') == "true") ? true : false;
+
+			var secureConnections:String = unescape(getParamValue('secureConnections'));
+			if (secureConnections.toLowerCase() == 'true') {
+			  _protocol = 'https';
+			}
 
 			_universal = (getParamValue('universal') == "true") ? true : false;
 			if (_universal) {
@@ -172,7 +179,7 @@ package {
 					payload += "&ni=1";
 				}
 				payload += "&time=" + new Date().getTime(); //cachebust
-				var req:URLRequest = new URLRequest('http://www.google-analytics.com/collect?'+payload);
+				var req:URLRequest = new URLRequest(_protocol+'://www.google-analytics.com/collect?'+payload);
 			  var l:Loader = new Loader();
 			  l.contentLoaderInfo.addEventListener(Event.COMPLETE, cleanup);
 			  l.contentLoaderInfo.addEventListener(IOErrorEvent.IO_ERROR, cleanup);
