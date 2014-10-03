@@ -1,23 +1,21 @@
 About
 =====
 
-This project provides a Flash plug-in for measuring analytics within
-Brightcove video players. It can be used out-of-the-box for simple
-analytics or as a framework to customize data.
+This project provides a Flash plug-in for measuring analytics within Brightcove video players. It can be used out-of-the-box for simple analytics or as a framework to customize data.
 
 Universal Update
 ================
 
-###Universal analyics
+###Universal analyics support
 This plugin now additionally supports Universal Analytics. To use Universal Analytics, add `&universal=true` to the plugin URL.
 
 ###Non-interaction events
-If using Universal Analytics you can also opt to use non-interaction events by adding `&ni=true` to the URL. Non-interaction events probably make sense for video, but don't show up in real-time analytics.
+If using Universal Analytics you can also opt to use non-interaction events by adding `&ni=true` to the URL. Non-interaction events probably make sense for video playback.
 
-###Other changess
+###Other changes
 
-* Fixes crash if no content has been loaded into the player when plugin initialises
-* Uses "Brightcove Player" rather than "null" if `&playerType` isn't specified
+* Fixes crash if no content has been loaded into the player yet at the time the plugin initialises
+* Uses "Brightcove Player" rather than "null" if `&playerType` isn't specified, as originally documented
 * Bumped version number to 2 for Universal Analytics changes
 
 Setup
